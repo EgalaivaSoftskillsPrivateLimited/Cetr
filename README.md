@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Egalaiva Certificate Portal
+
+Issues and verifies Egalaiva program completion certificates. Built with Next.js.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Routes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/` — landing page with a certificate ID lookup form.
+- `/certificate-print?id=<CERTIFICATE_ID>` — renders a printable certificate for the given ID (uses the sample `CERT-2025-8892` if `id` is omitted). Use your browser's Print dialog to save it as a PDF.
+- `/verify/<CERTIFICATE_ID>` — public verification page. Shows the recipient's details and lets them download the issued PDF. This is the URL encoded in each certificate's QR code.
 
-## Learn More
+## Adding a certificate
 
-To learn more about Next.js, take a look at the following resources:
+1. Add an entry to `src/data/certificates.ts` (recipient name, program, dates, etc.) keyed by a unique certificate ID.
+2. Print/export the certificate from `/certificate-print?id=<CERTIFICATE_ID>` and save the resulting PDF to `public/certificates/<CERTIFICATE_ID>.pdf`, matching the `pdfPath` in the data entry.
+3. The certificate is now verifiable and downloadable at `/verify/<CERTIFICATE_ID>`, and its QR code will point there.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Configuration
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Set `SITE_URL` (e.g. `https://your-deployed-domain.com`) in your production environment so QR codes and verification links resolve to the right domain. It defaults to `http://localhost:3000` in development.
 
-## Deploy on Vercel
+## Note on `public/`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Everything under `public/` is served as a public static file. Don't put source data (spreadsheets, unpublished documents, etc.) there — keep it in the gitignored `private/` folder instead.
