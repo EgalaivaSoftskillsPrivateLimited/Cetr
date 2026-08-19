@@ -2,7 +2,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 // Falls back to localhost in dev. Set SITE_URL in production (e.g. to your
 // deployed domain) so printed QR codes resolve correctly when scanned.
-function getSiteUrl(): string {
+export function getSiteUrl(): string {
   const configured = process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
   return (configured ?? 'http://localhost:3000').replace(/\/+$/, '');
 }

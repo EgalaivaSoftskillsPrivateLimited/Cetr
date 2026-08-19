@@ -33,21 +33,11 @@ export default function Certificate({
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Montserrat:wght@300;400;500;600;700;800;900&display=swap');
 
-        @font-face {
-          font-family: 'Signerica';
-          src: url('/font/SignericaFat-1XOe.ttf') format('truetype');
-          font-weight: 400;
-          font-style: normal;
-        }
-
         .font-sans-cert {
           font-family: 'Montserrat', sans-serif;
         }
         .font-recipient {
           font-family: 'Alex Brush', cursive;
-        }
-        .font-signature {
-          font-family: 'Signerica', cursive;
         }
 
         @page {
@@ -171,9 +161,12 @@ export default function Certificate({
 
               {/* Signature Section */}
               <div className="flex flex-col">
-                <div className="font-signature text-lg text-gray-200 h-10 mb-1 select-none">
-                  {founderName}
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/sign/sign.png"
+                  alt={`${founderName} signature`}
+                  className="h-10 w-auto object-contain object-left mb-1 select-none"
+                />
                 <div className="text-base font-bold text-[#8da5ff] tracking-wider uppercase">
                   {founderName}
                 </div>

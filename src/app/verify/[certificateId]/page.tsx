@@ -1,71 +1,98 @@
-import Link from 'next/link';
-import { getCertificate } from '@/data/certificates';
+import Link from "next/link";
+import { getCertificate } from "@/data/certificates";
+import { AnnotationTag, btnPrimary, btnSecondary, CornerHandles, Eyebrow } from "@/ui";
 
 export default async function VerifyPage({
   params,
-}: PageProps<'/verify/[certificateId]'>) {
+}: PageProps<"/verify/[certificateId]">) {
   const { certificateId } = await params;
   const record = getCertificate(certificateId);
 
   if (!record) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
-        <h1 className="text-2xl font-bold">Certificate not found</h1>
-        <p className="text-gray-500 max-w-md">
-          No certificate matches ID <span className="font-mono">{certificateId}</span>.
-          Double-check the ID or QR code and try again.
-        </p>
-        <Link href="/" className="text-blue-600 hover:underline">
-          Back home
-        </Link>
+      <main className="flex min-h-screen items-center justify-center bg-navy px-5 py-10">
+        <div className="relative w-full max-w-[420px] rounded-[28px] border-[1.5px] border-dashed border-ink/15 bg-paper p-9 text-center shadow-[0_40px_80px_rgba(0,0,0,0.35)]">
+          <CornerHandles />
+          <Eyebrow>Verification Failed</Eyebrow>
+          <h1 className="mt-2 text-2xl font-extrabold uppercase tracking-tight text-ink">
+            Certificate Not Found
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-ink/60">
+            No certificate matches ID{" "}
+            <span className="font-mono text-ink">{certificateId}</span>. Double-check the ID
+            or QR code and try again.
+          </p>
+          <Link href="/" className={`${btnPrimary} mt-6 w-full`}>
+            ← Back Home
+          </Link>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center gap-8 p-8">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <span className="inline-flex items-center gap-2 text-green-600 font-semibold">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <main className="flex min-h-screen items-center justify-center bg-navy px-5 py-10">
+      <div className="relative w-full max-w-[460px] rounded-[28px] border-[1.5px] border-dashed border-ink/15 bg-paper p-9 text-center shadow-[0_40px_80px_rgba(0,0,0,0.35)]">
+        <CornerHandles />
+        <AnnotationTag className="absolute -top-4 right-6 rotate-3 bg-blue">
+          ✓ Verified
+        </AnnotationTag>
+
+        <div className="mx-auto mb-1.5 flex h-9 w-9 items-center justify-center rounded-full bg-blue" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M4 12l5 5 11-11" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Certificate Verified
-        </span>
-        <h1 className="text-3xl font-bold">{record.recipientName}</h1>
-        <p className="text-gray-500">
+        </div>
+
+        <Eyebrow>Certificate Verified</Eyebrow>
+        <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-ink">
+          {record.recipientName}
+        </h1>
+        <p className="mt-1 text-sm text-ink/60">
           Issued by {record.companyName} on {record.issueDate}
         </p>
+
+        <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 rounded-xl border border-ink/10 bg-ink/[0.03] p-4 text-left text-sm">
+          <dt className="text-ink/45">Program</dt>
+          <dd className="font-semibold text-ink">{record.programName}</dd>
+          <dt className="text-ink/45">Duration</dt>
+          <dd className="font-semibold text-ink">{record.duration}</dd>
+          <dt className="text-ink/45">Issued by</dt>
+          <dd className="font-semibold text-ink">
+            {record.founderName} ({record.founderTitle})
+          </dd>
+          <dt className="text-ink/45">Certificate ID</dt>
+          <dd className="font-mono text-xs font-semibold text-ink">{record.certificateId}</dd>
+        </dl>
+
+        <div className="mt-6 flex flex-col gap-3">
+          {record.pdfPath ? (
+            <a href={record.pdfPath} download className={`${btnPrimary} w-full`}>
+              Download Certificate (PDF) →
+            </a>
+          ) : (
+            <a
+              href={`/certificate-print?id=${encodeURIComponent(record.certificateId)}`}
+              target="_blank"
+              rel="noreferrer"
+              className={`${btnPrimary} w-full`}
+            >
+              View / Download Certificate →
+            </a>
+          )}
+          <Link href="/" className={`${btnSecondary} w-full`}>
+            Back Home
+          </Link>
+        </div>
+
+        {record.pdfPath && (
+          <iframe
+            src={record.pdfPath}
+            title={`Certificate ${record.certificateId}`}
+            className="mt-6 aspect-[297/210] w-full rounded-lg border border-ink/10"
+          />
+        )}
       </div>
-
-      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm w-full max-w-md">
-        <dt className="text-gray-500">Program</dt>
-        <dd className="font-medium">{record.programName}</dd>
-        <dt className="text-gray-500">Duration</dt>
-        <dd className="font-medium">{record.duration}</dd>
-        <dt className="text-gray-500">Issued by</dt>
-        <dd className="font-medium">
-          {record.founderName} ({record.founderTitle})
-        </dd>
-        <dt className="text-gray-500">Certificate ID</dt>
-        <dd className="font-mono">{record.certificateId}</dd>
-      </dl>
-
-      <a
-        href={record.pdfPath}
-        download
-        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded-md shadow-lg transition-all flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-        </svg>
-        Download Certificate (PDF)
-      </a>
-
-      <iframe
-        src={record.pdfPath}
-        title={`Certificate ${record.certificateId}`}
-        className="w-full max-w-3xl aspect-[297/210] border rounded-md"
-      />
     </main>
   );
 }
