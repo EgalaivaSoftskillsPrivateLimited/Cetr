@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { buildVerificationUrl } from "@/utils/qrcode";
+import { buildVerificationUrl } from "@/lib/siteUrl";
 import { renderCertificatePdf } from "@/lib/certificatePdf";
 import { findIssuedCertificate, markCertificateEmailSent } from "@/lib/certificateStore";
-import { sendCertificateEmail } from "@/lib/mailer";
+import { isSmtpConfigured, sendCertificateEmail } from "@/lib/mailer";
 
 export async function POST(
   _request: NextRequest,
@@ -15,21 +15,28 @@ export async function POST(
     return NextResponse.json({ error: "Certificate not found." }, { status: 404 });
   }
 
+  if (!isSmtpConfigured()) {
+    return NextResponse.json(
+      { emailSent: false, error: "Email is not configured on this server." },
+      { status: 503 }
+    );
+  }
+
   try {
     const pdfBuffer = await renderCertificatePdf(certificateId);
     await sendCertificateEmail({
       to: record.email,
       recipientName: record.recipientName,
-      certificateId,
-      verificationUrl: buildVerificationUrl(certificateId),
+      certificateId: record.certificateId,
+      verificationUrl: buildVerificationUrl(record.certificateId),
       pdfBuffer,
     });
-    markCertificateEmailSent(certificateId, true);
+    markCertificateEmailSent(record.certificateId, true);
     return NextResponse.json({ emailSent: true });
   } catch (err) {
-    markCertificateEmailSent(certificateId, false);
+    markCertificateEmailSent(record.certificateId, false);
     const message = err instanceof Error ? err.message : "Unknown email error.";
-    console.error(`[certificates/email] Failed to resend ${certificateId}:`, err);
+    console.error(`[certificates/email] Failed to resend ${record.certificateId}:`, err);
     return NextResponse.json({ emailSent: false, error: message }, { status: 502 });
   }
 }

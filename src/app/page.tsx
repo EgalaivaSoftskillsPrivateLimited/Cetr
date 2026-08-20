@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Certificate from "@/components/Certificate";
-import { buildVerificationUrl } from "@/utils/qrcode";
+import { buildVerificationUrl } from "@/lib/siteUrl";
 import type { QuizKey, SubmissionData } from "@/lib/submission";
 import { QUIZ_QUESTIONS } from "@/data/quiz";
 import {
@@ -47,6 +47,7 @@ interface FeedbackState {
 
 interface IssueCertificateResponse {
   certificateId: string;
+  issueDate?: string;
   emailSent: boolean;
   emailError?: string;
   error?: string;
@@ -71,6 +72,8 @@ function validatePersonal(form: PersonalForm): PersonalErrors {
   const errors: PersonalErrors = {};
   if (form.fullName.trim().length < 2) {
     errors.fullName = "Enter your full name.";
+  } else if (form.fullName.trim().length > 80) {
+    errors.fullName = "Name is too long for the certificate.";
   }
   if (!EMAIL_RE.test(form.email.trim())) {
     errors.email = "Enter a valid email address.";
@@ -278,6 +281,13 @@ function Sidebar() {
         </ul>
       </div>
 
+      <p className="text-xs text-cream/45">
+        Already have a certificate?{" "}
+        <a href="/verify" className="font-semibold text-lime underline-offset-2 hover:underline">
+          Verify it here
+        </a>
+      </p>
+
       <hr className="my-1 h-px w-full border-none bg-white/15" />
 
       <Eyebrow on="dark">What You&apos;ll Get</Eyebrow>
@@ -350,9 +360,11 @@ export default function Home() {
 
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [certificateId, setCertificateId] = useState<string | null>(null);
+  const [issueDate, setIssueDate] = useState<string>(formatIssueDate(new Date()));
   const [certificateEmailSent, setCertificateEmailSent] = useState(false);
   const [certView, setCertView] = useState<CertificateView>(null);
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [downloadStatus, setDownloadStatus] = useState<"idle" | "saving" | "error">("idle");
 
   useEffect(() => {
     if (certView === "download") {
@@ -443,12 +455,35 @@ export default function Home() {
 
       setSubmission(data);
       setCertificateId(body.certificateId);
+      setIssueDate(body.issueDate ?? formatIssueDate(new Date()));
       setCertificateEmailSent(body.emailSent);
       setStep(4);
     } catch {
       setFeedbackError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!certificateId) return;
+    setDownloadStatus("saving");
+    try {
+      const res = await fetch(`/api/certificates/${encodeURIComponent(certificateId)}/pdf`);
+      if (!res.ok) throw new Error("pdf failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${certificateId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setDownloadStatus("idle");
+    } catch {
+      setDownloadStatus("error");
+      setCertView("download");
     }
   };
 
@@ -506,8 +541,13 @@ export default function Home() {
               <button type="button" onClick={() => setCertView("view")} className={`${btnPrimary} w-full`}>
                 View Certificate
               </button>
-              <button type="button" onClick={() => setCertView("download")} className={`${btnSecondary} w-full`}>
-                Download Certificate
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={downloadStatus === "saving"}
+                className={`${btnSecondary} w-full`}
+              >
+                {downloadStatus === "saving" ? "Preparing PDF…" : "Download Certificate"}
               </button>
               <button
                 type="button"
@@ -524,6 +564,13 @@ export default function Home() {
                   : "Email Certificate Again"}
               </button>
             </div>
+
+            <a
+              href={`/verify/${encodeURIComponent(certificateId)}`}
+              className="mt-1 text-xs font-semibold uppercase tracking-wide text-blue hover:underline"
+            >
+              Verify this certificate
+            </a>
 
             <p className="mt-2 text-xs text-ink/40">
               {certificateEmailSent
@@ -550,7 +597,7 @@ export default function Home() {
               programName={WORKSHOP_PROGRAM_NAME}
               duration={WORKSHOP_DURATION}
               companyName={WORKSHOP_COMPANY_NAME}
-              issueDate={formatIssueDate(new Date())}
+              issueDate={issueDate}
               founderName={WORKSHOP_FOUNDER_NAME}
               founderTitle={WORKSHOP_FOUNDER_TITLE}
               certificateId={certificateId}

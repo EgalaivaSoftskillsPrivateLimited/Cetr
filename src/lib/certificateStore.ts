@@ -1,6 +1,17 @@
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
-import type { CertificateRecord } from "@/data/certificates";
+
+export interface CertificateRecord {
+  certificateId: string;
+  recipientName: string;
+  programName: string;
+  duration: string;
+  companyName: string;
+  issueDate: string;
+  founderName: string;
+  founderTitle: string;
+  pdfPath?: string;
+}
 
 /**
  * Metadata only — no PDFs are persisted. Certificates are re-rendered on
@@ -40,12 +51,20 @@ function writeStore(store: Store): void {
   writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), "utf-8");
 }
 
+function decodeId(certificateId: string): string {
+  try {
+    return decodeURIComponent(certificateId).trim();
+  } catch {
+    return certificateId.trim();
+  }
+}
+
 export function findIssuedCertificate(certificateId: string): IssuedCertificate | undefined {
-  return readStore()[certificateId];
+  return readStore()[decodeId(certificateId)];
 }
 
 export function certificateIdExists(certificateId: string): boolean {
-  return certificateId in readStore();
+  return decodeId(certificateId) in readStore();
 }
 
 export function saveIssuedCertificate(record: IssuedCertificate): void {
@@ -56,7 +75,7 @@ export function saveIssuedCertificate(record: IssuedCertificate): void {
 
 export function markCertificateEmailSent(certificateId: string, emailSent: boolean): void {
   const store = readStore();
-  const record = store[certificateId];
+  const record = store[decodeId(certificateId)];
   if (!record) return;
   record.emailSent = emailSent;
   writeStore(store);

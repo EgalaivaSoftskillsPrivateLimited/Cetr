@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getCertificate } from "@/data/certificates";
 import { AnnotationTag, btnPrimary, btnSecondary, CornerHandles, Eyebrow } from "@/ui";
 
+export const dynamic = "force-dynamic";
+
 export default async function VerifyPage({
   params,
 }: PageProps<"/verify/[certificateId]">) {
@@ -22,7 +24,10 @@ export default async function VerifyPage({
             <span className="font-mono text-ink">{certificateId}</span>. Double-check the ID
             or QR code and try again.
           </p>
-          <Link href="/" className={`${btnPrimary} mt-6 w-full`}>
+          <Link href="/verify" className={`${btnPrimary} mt-6 w-full`}>
+            Try Another ID
+          </Link>
+          <Link href="/" className={`${btnSecondary} mt-3 w-full`}>
             ← Back Home
           </Link>
         </div>
@@ -66,32 +71,24 @@ export default async function VerifyPage({
         </dl>
 
         <div className="mt-6 flex flex-col gap-3">
-          {record.pdfPath ? (
-            <a href={record.pdfPath} download className={`${btnPrimary} w-full`}>
-              Download Certificate (PDF) →
-            </a>
-          ) : (
-            <a
-              href={`/certificate-print?id=${encodeURIComponent(record.certificateId)}`}
-              target="_blank"
-              rel="noreferrer"
-              className={`${btnPrimary} w-full`}
-            >
-              View / Download Certificate →
-            </a>
-          )}
+          <a
+            href={`/api/certificates/${encodeURIComponent(record.certificateId)}/pdf`}
+            className={`${btnPrimary} w-full`}
+          >
+            Download Certificate (PDF) →
+          </a>
+          <a
+            href={`/certificate-print?id=${encodeURIComponent(record.certificateId)}`}
+            target="_blank"
+            rel="noreferrer"
+            className={`${btnSecondary} w-full`}
+          >
+            View Certificate
+          </a>
           <Link href="/" className={`${btnSecondary} w-full`}>
             Back Home
           </Link>
         </div>
-
-        {record.pdfPath && (
-          <iframe
-            src={record.pdfPath}
-            title={`Certificate ${record.certificateId}`}
-            className="mt-6 aspect-[297/210] w-full rounded-lg border border-ink/10"
-          />
-        )}
       </div>
     </main>
   );

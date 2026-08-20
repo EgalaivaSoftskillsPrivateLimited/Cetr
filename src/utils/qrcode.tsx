@@ -1,15 +1,7 @@
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG } from "qrcode.react";
+import { buildVerificationUrl, getSiteUrl } from "@/lib/siteUrl";
 
-// Falls back to localhost in dev. Set SITE_URL in production (e.g. to your
-// deployed domain) so printed QR codes resolve correctly when scanned.
-export function getSiteUrl(): string {
-  const configured = process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL;
-  return (configured ?? 'http://localhost:3000').replace(/\/+$/, '');
-}
-
-export function buildVerificationUrl(certificateId: string): string {
-  return `${getSiteUrl()}/verify/${encodeURIComponent(certificateId)}`;
-}
+export { buildVerificationUrl, getSiteUrl };
 
 interface CertificateQRCodeProps {
   value: string;

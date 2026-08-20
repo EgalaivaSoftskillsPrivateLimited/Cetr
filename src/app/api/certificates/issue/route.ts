@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { buildVerificationUrl } from "@/utils/qrcode";
+import { buildVerificationUrl } from "@/lib/siteUrl";
 import { renderCertificatePdf } from "@/lib/certificatePdf";
 import {
   certificateIdExists,
@@ -7,8 +7,9 @@ import {
   saveIssuedCertificate,
   type IssuedCertificate,
 } from "@/lib/certificateStore";
-import { sendCertificateEmail } from "@/lib/mailer";
-import { validateSubmission, type SubmissionData } from "@/lib/submission";
+import { QUIZ_QUESTIONS } from "@/data/quiz";
+import { isSmtpConfigured, sendCertificateEmail } from "@/lib/mailer";
+import { validateSubmission, type QuizKey, type SubmissionData } from "@/lib/submission";
 import {
   WORKSHOP_COMPANY_NAME,
   WORKSHOP_DURATION,
@@ -20,13 +21,19 @@ import {
 } from "@/lib/workshop";
 
 function generateUniqueCertificateId(): string {
-  let id = generateCertificateId();
-  let attempts = 0;
-  while (certificateIdExists(id) && attempts < 5) {
-    id = generateCertificateId();
-    attempts += 1;
+  for (let attempts = 0; attempts < 20; attempts += 1) {
+    const id = generateCertificateId();
+    if (!certificateIdExists(id)) return id;
   }
-  return id;
+  throw new Error("Could not allocate a unique certificate ID.");
+}
+
+function scoreQuiz(answers: Partial<Record<QuizKey, string>> | undefined): number {
+  if (!answers) return 0;
+  return QUIZ_QUESTIONS.reduce(
+    (acc, q) => acc + (answers[q.key] === q.correctAnswer ? 1 : 0),
+    0
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -43,7 +50,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
-  const certificateId = generateUniqueCertificateId();
+  let certificateId: string;
+  try {
+    certificateId = generateUniqueCertificateId();
+  } catch {
+    return NextResponse.json(
+      { error: "Could not issue a certificate. Please try again." },
+      { status: 500 }
+    );
+  }
+
+  const emptyAnswers = { question1: "", question2: "", question3: "", question4: "" };
+  const quizAnswers = data.quizAnswers ?? emptyAnswers;
+  const quizScore = scoreQuiz(quizAnswers);
 
   const record: IssuedCertificate = {
     certificateId,
@@ -57,8 +76,8 @@ export async function POST(request: NextRequest) {
     email: data.email!.trim(),
     phone: data.phone!.trim(),
     college: data.college!.trim(),
-    quizAnswers: data.quizAnswers ?? { question1: "", question2: "", question3: "", question4: "" },
-    quizScore: data.quizScore ?? 0,
+    quizAnswers,
+    quizScore,
     workshopRating: data.workshopRating!,
     usefulnessRating: data.usefulnessRating!,
     engagementRating: data.engagementRating!,
@@ -73,21 +92,28 @@ export async function POST(request: NextRequest) {
 
   let emailSent = false;
   let emailError: string | undefined;
-  try {
-    const pdfBuffer = await renderCertificatePdf(certificateId);
-    await sendCertificateEmail({
-      to: record.email,
-      recipientName: record.recipientName,
-      certificateId,
-      verificationUrl: buildVerificationUrl(certificateId),
-      pdfBuffer,
-    });
-    emailSent = true;
-  } catch (err) {
-    emailError = err instanceof Error ? err.message : "Unknown email error.";
-    console.error(`[certificates/issue] Failed to email ${certificateId}:`, err);
+  if (isSmtpConfigured()) {
+    try {
+      const pdfBuffer = await renderCertificatePdf(certificateId);
+      await sendCertificateEmail({
+        to: record.email,
+        recipientName: record.recipientName,
+        certificateId,
+        verificationUrl: buildVerificationUrl(certificateId),
+        pdfBuffer,
+      });
+      emailSent = true;
+    } catch (err) {
+      emailError = err instanceof Error ? err.message : "Unknown email error.";
+      console.error(`[certificates/issue] Failed to email ${certificateId}:`, err);
+    }
   }
   markCertificateEmailSent(certificateId, emailSent);
 
-  return NextResponse.json({ certificateId, emailSent, emailError });
+  return NextResponse.json({
+    certificateId,
+    issueDate: record.issueDate,
+    emailSent,
+    emailError,
+  });
 }

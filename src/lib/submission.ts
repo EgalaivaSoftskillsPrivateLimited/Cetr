@@ -17,10 +17,17 @@ export interface SubmissionData {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function isRating(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 5;
+}
+
 export function validateSubmission(data: Partial<SubmissionData> | null): string | null {
   if (!data) return "Missing submission data.";
   if (!data.fullName || data.fullName.trim().length < 2) {
     return "A valid full name is required.";
+  }
+  if (data.fullName.trim().length > 80) {
+    return "Name is too long for the certificate.";
   }
   if (!data.email || !EMAIL_RE.test(data.email.trim())) {
     return "A valid email address is required.";
@@ -33,15 +40,12 @@ export function validateSubmission(data: Partial<SubmissionData> | null): string
     return "College / organization is required.";
   }
   if (
-    !data.workshopRating ||
-    !data.usefulnessRating ||
-    !data.engagementRating ||
-    !data.practicalRating
+    !isRating(data.workshopRating) ||
+    !isRating(data.usefulnessRating) ||
+    !isRating(data.engagementRating) ||
+    !isRating(data.practicalRating)
   ) {
     return "All feedback ratings are required.";
-  }
-  if (typeof data.quizScore !== "number") {
-    return "Quiz score is required.";
   }
   return null;
 }

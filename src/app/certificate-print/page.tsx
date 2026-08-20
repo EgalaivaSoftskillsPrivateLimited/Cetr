@@ -1,13 +1,15 @@
-import { notFound } from 'next/navigation';
-import Certificate from '@/components/Certificate';
-import { getCertificate } from '@/data/certificates';
-import { buildVerificationUrl } from '@/utils/qrcode';
+import { notFound } from "next/navigation";
+import Certificate from "@/components/Certificate";
+import { getCertificate } from "@/data/certificates";
+import { buildVerificationUrl } from "@/lib/siteUrl";
 
-const DEFAULT_CERTIFICATE_ID = 'CERT-2025-8892';
+export const dynamic = "force-dynamic";
+
+const DEFAULT_CERTIFICATE_ID = "CERT-2025-8892";
 
 export default async function CertificatePrintPage({
   searchParams,
-}: PageProps<'/certificate-print'>) {
+}: PageProps<"/certificate-print">) {
   const { id } = await searchParams;
   const rawId = Array.isArray(id) ? id[0] : id;
   const certificateId = rawId ?? DEFAULT_CERTIFICATE_ID;

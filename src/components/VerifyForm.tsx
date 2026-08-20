@@ -1,11 +1,12 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { btnPrimary, fieldInput } from "@/ui";
 
 export default function VerifyForm() {
   const router = useRouter();
-  const [certificateId, setCertificateId] = useState('');
+  const [certificateId, setCertificateId] = useState("");
 
   return (
     <form
@@ -16,19 +17,19 @@ export default function VerifyForm() {
           router.push(`/verify/${encodeURIComponent(trimmed)}`);
         }
       }}
-      className="flex w-full max-w-sm gap-2"
+      className="flex w-full flex-col gap-3"
     >
-      <input
-        type="text"
-        value={certificateId}
-        onChange={(e) => setCertificateId(e.target.value)}
-        placeholder="e.g. CERT-2025-8892"
-        className="flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm font-mono"
-      />
-      <button
-        type="submit"
-        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded-md shadow-lg transition-all"
-      >
+      <div className={fieldInput}>
+        <input
+          type="text"
+          value={certificateId}
+          onChange={(e) => setCertificateId(e.target.value)}
+          placeholder="e.g. EGALAIVA-XXXXXX"
+          autoComplete="off"
+          className="min-w-0 flex-1 border-none bg-transparent py-3 font-mono text-[15px] text-ink outline-none placeholder:text-ink/35"
+        />
+      </div>
+      <button type="submit" className={`${btnPrimary} w-full`}>
         Verify
       </button>
     </form>

@@ -15,10 +15,19 @@ export function formatIssueDate(date: Date): string {
 
 const ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+function randomIndex(max: number): number {
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] % max;
+  }
+  return Math.floor(Math.random() * max);
+}
+
 export function generateCertificateId(): string {
   let id = "";
-  for (let i = 0; i < 6; i += 1) {
-    id += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
+  for (let i = 0; i < 8; i += 1) {
+    id += ID_CHARS[randomIndex(ID_CHARS.length)];
   }
   return `EGALAIVA-${id}`;
 }

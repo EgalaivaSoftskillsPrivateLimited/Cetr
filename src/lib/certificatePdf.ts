@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { getSiteUrl } from "@/utils/qrcode";
+import { getSiteUrl } from "@/lib/siteUrl";
 
 /**
  * Renders /certificate-print for the given certificate through headless
@@ -16,8 +16,10 @@ export async function renderCertificatePdf(certificateId: string): Promise<Buffe
 
   try {
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: "networkidle0" });
+    await page.setViewport({ width: 1123, height: 794, deviceScaleFactor: 2 });
+    await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
     await page.waitForSelector(".cert-container");
+    await page.evaluate(() => document.fonts.ready);
     await page.emulateMediaType("print");
 
     const pdf = await page.pdf({
