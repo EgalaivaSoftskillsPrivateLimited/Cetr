@@ -1,6 +1,11 @@
 'use client';
 
+import { useLayoutEffect, useRef, useState } from 'react';
 import { CertificateQRCode } from '@/utils/qrcode';
+
+// A4 landscape at 96dpi — matches the @page 297mm x 210mm print size below.
+const CERT_WIDTH_PX = 1122.52;
+const CERT_HEIGHT_PX = 793.7;
 
 interface CertificateProps {
   recipientName: string;
@@ -27,6 +32,24 @@ export default function Certificate({
   verificationUrl,
   showPrintButton = true,
 }: CertificateProps) {
+  const scaleWrapperRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const el = scaleWrapperRef.current;
+    if (!el) return;
+
+    const updateScale = () => {
+      const available = el.clientWidth;
+      setScale(available > 0 ? Math.min(1, available / CERT_WIDTH_PX) : 1);
+    };
+
+    updateScale();
+    const resizeObserver = new ResizeObserver(updateScale);
+    resizeObserver.observe(el);
+    return () => resizeObserver.disconnect();
+  }, []);
+
   return (
     <>
       {/* Import Custom Fonts */}
@@ -59,7 +82,13 @@ export default function Certificate({
             padding: 0 !important;
             display: block !important;
           }
+          .cert-scale-wrapper {
+            width: 297mm !important;
+            max-width: none !important;
+            height: auto !important;
+          }
           .cert-container {
+            transform: none !important;
             box-shadow: none !important;
             margin: 0 !important;
             width: 297mm !important;
@@ -70,8 +99,17 @@ export default function Certificate({
       `}</style>
 
       <div className="cert-wrapper flex flex-col items-center justify-center min-h-screen bg-neutral-900 p-4 no-print:py-10">
-        {/* Printable Certificate Frame */}
-        <div className="cert-container relative w-[297mm] h-[210mm] bg-[#0b0c10] text-white overflow-hidden shadow-2xl flex font-sans-cert select-none">
+        {/* Scales the fixed A4-landscape frame down to fit small screens; print/PDF ignores this (see @media print above) */}
+        <div
+          ref={scaleWrapperRef}
+          className="cert-scale-wrapper w-full max-w-[1122px] overflow-hidden"
+          style={{ height: CERT_HEIGHT_PX * scale }}
+        >
+          {/* Printable Certificate Frame */}
+          <div
+            className="cert-container relative w-[297mm] h-[210mm] bg-[#0b0c10] text-white overflow-hidden shadow-2xl flex font-sans-cert select-none"
+            style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
+          >
 
           {/* ================= LEFT SIDEBAR ================= */}
           <div className="relative w-[28%] bg-[#12141c] border-r border-white/10 flex flex-col justify-between p-8 overflow-hidden z-10">
@@ -165,7 +203,7 @@ export default function Certificate({
                 <img
                   src="/sign/sign.png"
                   alt={`${founderName} signature`}
-                  className="h-10 w-auto object-contain object-left mb-1 select-none"
+                  className="h-16 w-auto object-contain object-left mb-1 select-none"
                 />
                 <div className="text-base font-bold text-[#8da5ff] tracking-wider uppercase">
                   {founderName}
@@ -202,6 +240,7 @@ export default function Certificate({
             </div>
 
           </div>
+        </div>
         </div>
 
         {/* Print / Save Action Button */}
