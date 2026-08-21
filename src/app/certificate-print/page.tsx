@@ -24,6 +24,7 @@ export default async function CertificatePrintPage({
     <Certificate
       recipientName={record.recipientName}
       programName={record.programName}
+      certificateType={record.certificateType}
       duration={record.duration}
       companyName={record.companyName}
       issueDate={record.issueDate}

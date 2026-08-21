@@ -8,9 +8,11 @@ import {
   type IssuedCertificate,
 } from "@/lib/certificateStore";
 import { QUIZ_QUESTIONS } from "@/data/quiz";
+import { claimToken, findClaimToken } from "@/lib/claimTokenStore";
 import { isSmtpConfigured, sendCertificateEmail } from "@/lib/mailer";
 import { validateSubmission, type QuizKey, type SubmissionData } from "@/lib/submission";
 import {
+  DEFAULT_CERTIFICATE_TYPE,
   WORKSHOP_COMPANY_NAME,
   WORKSHOP_DURATION,
   WORKSHOP_FOUNDER_NAME,
@@ -44,10 +46,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const data = body as Partial<SubmissionData>;
+  const data = body as Partial<SubmissionData> & { token?: string };
   const validationError = validateSubmission(data);
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
+  }
+
+  const { token } = data;
+  if (!token || typeof token !== "string") {
+    return NextResponse.json(
+      { error: "Missing claim link. Open your certificate link again to continue." },
+      { status: 400 }
+    );
+  }
+  const claim = findClaimToken(token);
+  if (!claim) {
+    return NextResponse.json(
+      { error: "This claim link is invalid. Ask your workshop organizer for a new one." },
+      { status: 403 }
+    );
+  }
+  if (claim.used) {
+    return NextResponse.json(
+      { error: "This claim link has already been used. Each link works once." },
+      { status: 409 }
+    );
   }
 
   let certificateId: string;
@@ -60,6 +83,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!claimToken(token, certificateId)) {
+    return NextResponse.json(
+      { error: "This claim link has already been used. Each link works once." },
+      { status: 409 }
+    );
+  }
+
   const emptyAnswers = { question1: "", question2: "", question3: "", question4: "" };
   const quizAnswers = data.quizAnswers ?? emptyAnswers;
   const quizScore = scoreQuiz(quizAnswers);
@@ -67,7 +97,8 @@ export async function POST(request: NextRequest) {
   const record: IssuedCertificate = {
     certificateId,
     recipientName: data.fullName!.trim(),
-    programName: WORKSHOP_PROGRAM_NAME,
+    programName: claim.programName || WORKSHOP_PROGRAM_NAME,
+    certificateType: claim.certificateType || DEFAULT_CERTIFICATE_TYPE,
     duration: WORKSHOP_DURATION,
     companyName: WORKSHOP_COMPANY_NAME,
     issueDate: formatIssueDate(new Date()),
@@ -113,6 +144,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     certificateId,
     issueDate: record.issueDate,
+    programName: record.programName,
+    certificateType: record.certificateType,
     emailSent,
     emailError,
   });

@@ -12,7 +12,7 @@ export default async function VerifyPage({
 
   if (!record) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-navy px-5 py-10">
+      <main className="flex min-h-screen items-center justify-center bg-paper-soft px-5 py-10">
         <div className="relative w-full max-w-[420px] rounded-[28px] border-[1.5px] border-dashed border-ink/15 bg-paper p-9 text-center shadow-[0_40px_80px_rgba(0,0,0,0.35)]">
           <CornerHandles />
           <Eyebrow>Verification Failed</Eyebrow>
@@ -36,7 +36,7 @@ export default async function VerifyPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-navy px-5 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-paper-soft px-5 py-10">
       <div className="relative w-full max-w-[460px] rounded-[28px] border-[1.5px] border-dashed border-ink/15 bg-paper p-9 text-center shadow-[0_40px_80px_rgba(0,0,0,0.35)]">
         <CornerHandles />
         <AnnotationTag className="absolute -top-4 right-6 rotate-3 bg-blue">

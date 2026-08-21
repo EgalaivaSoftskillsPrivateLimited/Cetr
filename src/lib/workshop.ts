@@ -4,6 +4,11 @@ export const WORKSHOP_COMPANY_NAME = "Egalaiva Technologies";
 export const WORKSHOP_FOUNDER_NAME = "Aadhithya S";
 export const WORKSHOP_FOUNDER_TITLE = "Director- Egalaiva Softskills Pvt. Ltd.";
 
+/** Renders on the certificate as "Certificate Of <type>". */
+export const CERTIFICATE_TYPES = ["Appreciation", "Completion", "Participation", "Achievement"] as const;
+export type CertificateType = (typeof CERTIFICATE_TYPES)[number];
+export const DEFAULT_CERTIFICATE_TYPE: CertificateType = "Appreciation";
+
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",

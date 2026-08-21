@@ -3,6 +3,7 @@ import {
   type CertificateRecord,
 } from "@/lib/certificateStore";
 import {
+  DEFAULT_CERTIFICATE_TYPE,
   WORKSHOP_COMPANY_NAME,
   WORKSHOP_DURATION,
   WORKSHOP_FOUNDER_NAME,
@@ -17,6 +18,7 @@ const SEED_CERTIFICATES: Record<string, CertificateRecord> = {
     certificateId: "CERT-2025-8892",
     recipientName: "Sample Recipient",
     programName: WORKSHOP_PROGRAM_NAME,
+    certificateType: DEFAULT_CERTIFICATE_TYPE,
     duration: WORKSHOP_DURATION,
     companyName: WORKSHOP_COMPANY_NAME,
     issueDate: "19 Aug, 2026",
@@ -45,6 +47,7 @@ export function getCertificate(certificateId: string): CertificateRecord | undef
     certificateId: issued.certificateId,
     recipientName: issued.recipientName,
     programName: issued.programName,
+    certificateType: issued.certificateType,
     duration: issued.duration,
     companyName: issued.companyName,
     issueDate: issued.issueDate,

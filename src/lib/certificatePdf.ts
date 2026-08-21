@@ -1,21 +1,12 @@
-import puppeteer from "puppeteer";
+import puppeteer, { type Browser } from "puppeteer";
 import { getSiteUrl } from "@/lib/siteUrl";
 
-/**
- * Renders /certificate-print for the given certificate through headless
- * Chromium so the emailed/downloaded PDF matches the on-screen design
- * exactly — no separate PDF template to maintain.
- */
-export async function renderCertificatePdf(certificateId: string): Promise<Buffer> {
+const LAUNCH_ARGS = ["--no-sandbox", "--disable-setuid-sandbox"];
+
+async function renderWithBrowser(browser: Browser, certificateId: string): Promise<Buffer> {
   const url = `${getSiteUrl()}/certificate-print?id=${encodeURIComponent(certificateId)}`;
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.setViewport({ width: 1123, height: 794, deviceScaleFactor: 2 });
     await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
     await page.waitForSelector(".cert-container");
@@ -28,6 +19,36 @@ export async function renderCertificatePdf(certificateId: string): Promise<Buffe
     });
 
     return Buffer.from(pdf);
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * Renders /certificate-print for the given certificate through headless
+ * Chromium so the emailed/downloaded PDF matches the on-screen design
+ * exactly — no separate PDF template to maintain.
+ */
+export async function renderCertificatePdf(certificateId: string): Promise<Buffer> {
+  const browser = await puppeteer.launch({ headless: true, args: LAUNCH_ARGS });
+  try {
+    return await renderWithBrowser(browser, certificateId);
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * For rendering many certificates back-to-back (bulk issuance) — launches
+ * Chromium once and reuses it across all of them instead of paying the
+ * ~1-2s browser-launch cost per certificate.
+ */
+export async function withCertificatePdfBrowser<T>(
+  fn: (render: (certificateId: string) => Promise<Buffer>) => Promise<T>
+): Promise<T> {
+  const browser = await puppeteer.launch({ headless: true, args: LAUNCH_ARGS });
+  try {
+    return await fn((certificateId) => renderWithBrowser(browser, certificateId));
   } finally {
     await browser.close();
   }

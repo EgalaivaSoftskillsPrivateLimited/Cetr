@@ -10,6 +10,7 @@ const CERT_HEIGHT_PX = 793.7;
 interface CertificateProps {
   recipientName: string;
   programName: string;
+  certificateType?: string;
   duration: string;
   companyName: string;
   issueDate: string;
@@ -23,6 +24,7 @@ interface CertificateProps {
 export default function Certificate({
   recipientName,
   programName,
+  certificateType = 'Appreciation',
   duration,
   companyName,
   issueDate,
@@ -173,7 +175,7 @@ export default function Certificate({
                 Certificate
               </h1>
               <h2 className="text-6xl font-extrabold text-white tracking-tight">
-                Of Appreciation
+                Of {certificateType}
               </h2>
             </div>
 
