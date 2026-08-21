@@ -6,9 +6,11 @@ Issues and verifies Egalaiva program completion certificates. Built with Next.js
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in ADMIN_PASSWORD, SMTP_*, SESSION_SECRET
+cp .env.example .env.local   # fill in DATABASE_URL, ADMIN_PASSWORD, SMTP_*, SESSION_SECRET
 npm run dev
 ```
+
+Needs a running Postgres instance — set `DATABASE_URL` in `.env.local` to point at it. Schema (`migrations/*.sql`) is applied automatically on first request; no manual migration step needed.
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -26,14 +28,24 @@ Open [http://localhost:3000](http://localhost:3000).
 2. On `/admin`, enter a count (e.g. `10`) and click Generate — you get back that many `/claim/<token>` links, each usable once. Copy them individually or all at once, and send them to participants however you like (email, WhatsApp, etc. — this app doesn't send the invites itself).
 3. The dashboard's "All Links" table tracks every link ever generated: unused/claimed status, when it was created, and who claimed it.
 
-Tokens are stored as metadata only in `private/claim-tokens.json` (gitignored). A link is marked **used only after** the participant successfully receives a certificate through it — not merely on opening it — so a page refresh or an interrupted attempt won't strand someone with a dead link.
+Tokens are stored in the `claim_tokens` table (Postgres — see `src/lib/claimTokenStore.ts`). A link is marked **used only after** the participant successfully receives a certificate through it — not merely on opening it — so a page refresh or an interrupted attempt won't strand someone with a dead link.
 
 ## How a certificate gets issued
 
 1. A participant opens their `/claim/<token>` link and completes all 3 steps, which `POST`s to `/api/certificates/issue` along with the token.
-2. The server checks the token is valid and unused, atomically marks it used, generates a unique certificate ID, and saves **metadata only** (name, email, quiz score, ratings, etc.) to `private/certificates-store.json` — gitignored, never committed. No PDF is stored anywhere.
+2. The server checks the token is valid and unused, atomically marks it used, generates a unique certificate ID, and saves **metadata only** (name, email, quiz score, ratings, etc.) to the `certificates` table (`src/lib/certificateStore.ts`). No PDF is stored anywhere.
 3. The server renders `/certificate-print?id=<id>` through headless Chromium (`src/lib/certificatePdf.ts`) to produce the PDF on demand, and emails it via SMTP (`src/lib/mailer.ts`).
 4. `/certificate-print` and `/verify/<id>` look up the same metadata (`src/data/certificates.ts` merges the static seed data with the store) and re-render the certificate live — so re-downloading or re-verifying never depends on a stored file.
+
+## Database
+
+Postgres, accessed via the `pg` driver (`src/lib/db.ts`) — no ORM. Schema:
+
+- `programs` — distinct (name, certificate type) pairs, e.g. ("AI Engineering Workshop", "Appreciation").
+- `claim_tokens` — single-use links, referencing the `programs` row they'll issue a certificate for.
+- `certificates` — issued certificate metadata, referencing `programs` and (optionally) the `claim_tokens` row it was claimed through. `duration`/`company_name`/`founder_name`/`founder_title`/`issue_date` are snapshotted at issue time rather than joined live, so a certificate stays historically accurate if `src/lib/workshop.ts` constants change later.
+
+Migrations live in `migrations/*.sql` and run automatically (tracked in a `schema_migrations` table) the first time the app queries the database — add a new numbered `.sql` file for schema changes, don't edit applied ones.
 
 If SMTP isn't configured (or the send fails), the certificate is still issued and shown to the participant — they just see a note that the email didn't go out automatically, with a retry button that calls `/api/certificates/<id>/email`.
 
@@ -47,6 +59,7 @@ If SMTP isn't configured (or the send fails), the certificate is still issued an
 
 See `.env.example` for the full list. Key ones:
 
+- `DATABASE_URL` — Postgres connection string. Required; the app won't start without it.
 - `SITE_URL` — e.g. `https://your-deployed-domain.com`. Used for QR/verification links, generated claim link URLs, **and** by the headless-Chromium PDF renderer to fetch `/certificate-print`, so it must be reachable by the server itself. Defaults to `http://localhost:3000` in development.
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` — SMTP credentials for sending certificate emails. Without these, certificates still issue but aren't emailed.
 - `ADMIN_USERNAME` / `ADMIN_PASSWORD` — required to sign in at `/admin`. There's no default password; login is disabled until `ADMIN_PASSWORD` is set.

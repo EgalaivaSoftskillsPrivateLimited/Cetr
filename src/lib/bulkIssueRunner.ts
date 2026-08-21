@@ -26,10 +26,10 @@ export interface BulkRowInput {
   college?: string;
 }
 
-function generateUniqueCertificateId(): string {
+async function generateUniqueCertificateId(): Promise<string> {
   for (let attempts = 0; attempts < 20; attempts += 1) {
     const id = generateCertificateId();
-    if (!certificateIdExists(id)) return id;
+    if (!(await certificateIdExists(id))) return id;
   }
   throw new Error("Could not allocate a unique certificate ID.");
 }
@@ -71,7 +71,7 @@ async function processRow(
 
   let certificateId: string;
   try {
-    certificateId = generateUniqueCertificateId();
+    certificateId = await generateUniqueCertificateId();
   } catch {
     appendBulkResult(jobId, {
       row: rowNumber,
@@ -107,7 +107,7 @@ async function processRow(
     source: "bulk-admin",
   };
 
-  saveIssuedCertificate(record);
+  await saveIssuedCertificate(record);
 
   let emailSent = false;
   if (smtpReady && render) {
@@ -121,7 +121,7 @@ async function processRow(
         pdfBuffer,
       });
       emailSent = true;
-      markCertificateEmailSent(certificateId, true);
+      await markCertificateEmailSent(certificateId, true);
     } catch (err) {
       console.error(`[bulk-issue] Failed to email ${certificateId}:`, err);
     }

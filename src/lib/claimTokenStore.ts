@@ -1,6 +1,5 @@
 import { randomBytes } from "crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
-import path from "path";
+import { query, resolveProgramId, withTransaction } from "@/lib/db";
 
 export interface ClaimToken {
   token: string;
@@ -15,22 +14,38 @@ export interface ClaimToken {
   certificateType: string;
 }
 
-const STORE_DIR = path.join(process.cwd(), "private");
-const STORE_PATH = path.join(STORE_DIR, "claim-tokens.json");
-
-type Store = Record<string, ClaimToken>;
-
-function readStore(): Store {
-  try {
-    return JSON.parse(readFileSync(STORE_PATH, "utf-8")) as Store;
-  } catch {
-    return {};
-  }
+interface ClaimTokenRow {
+  token: string;
+  created_at: Date;
+  created_by: string;
+  used: boolean;
+  used_at: Date | null;
+  certificate_id: string | null;
+  program_name: string;
+  certificate_type: string;
 }
 
-function writeStore(store: Store): void {
-  mkdirSync(STORE_DIR, { recursive: true });
-  writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), "utf-8");
+const SELECT_WITH_PROGRAM = `
+  SELECT
+    ct.token, ct.created_at, ct.created_by, ct.used, ct.used_at,
+    c.certificate_id,
+    p.name AS program_name, p.certificate_type
+  FROM claim_tokens ct
+  JOIN programs p ON p.id = ct.program_id
+  LEFT JOIN certificates c ON c.claim_token = ct.token
+`;
+
+function toClaimToken(row: ClaimTokenRow): ClaimToken {
+  return {
+    token: row.token,
+    createdAt: row.created_at.toISOString(),
+    createdBy: row.created_by,
+    used: row.used,
+    usedAt: row.used_at?.toISOString(),
+    certificateId: row.certificate_id ?? undefined,
+    programName: row.program_name,
+    certificateType: row.certificate_type,
+  };
 }
 
 function generateToken(): string {
@@ -38,45 +53,39 @@ function generateToken(): string {
 }
 
 /** Generates `count` fresh single-use claim links (1-500), all for the same course/certificate type. */
-export function createClaimTokens(
+export async function createClaimTokens(
   count: number,
   createdBy: string,
   programName: string,
   certificateType: string
-): ClaimToken[] {
-  const store = readStore();
-  const created: ClaimToken[] = [];
+): Promise<ClaimToken[]> {
+  const programId = await resolveProgramId(programName, certificateType);
 
-  for (let i = 0; i < count; i += 1) {
-    let token = generateToken();
-    while (token in store) {
-      token = generateToken();
+  return withTransaction(async (client) => {
+    const created: ClaimToken[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const token = generateToken();
+      const rows = await client.query<ClaimTokenRow>(
+        `INSERT INTO claim_tokens (token, program_id, created_by)
+         VALUES ($1, $2, $3)
+         RETURNING token, created_at, created_by, used, used_at, NULL::text AS certificate_id, $4::text AS program_name, $5::text AS certificate_type`,
+        [token, programId, createdBy, programName, certificateType]
+      );
+      created.push(toClaimToken(rows[0]));
     }
-    const record: ClaimToken = {
-      token,
-      createdAt: new Date().toISOString(),
-      createdBy,
-      used: false,
-      programName,
-      certificateType,
-    };
-    store[token] = record;
-    created.push(record);
-  }
-
-  writeStore(store);
-  return created;
+    return created;
+  });
 }
 
-export function findClaimToken(token: string): ClaimToken | undefined {
-  return readStore()[token];
+export async function findClaimToken(token: string): Promise<ClaimToken | undefined> {
+  const rows = await query<ClaimTokenRow>(`${SELECT_WITH_PROGRAM} WHERE ct.token = $1`, [token]);
+  return rows[0] ? toClaimToken(rows[0]) : undefined;
 }
 
 /** Newest first. */
-export function listClaimTokens(): ClaimToken[] {
-  return Object.values(readStore()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+export async function listClaimTokens(): Promise<ClaimToken[]> {
+  const rows = await query<ClaimTokenRow>(`${SELECT_WITH_PROGRAM} ORDER BY ct.created_at DESC`);
+  return rows.map(toClaimToken);
 }
 
 /**
@@ -84,14 +93,23 @@ export function listClaimTokens(): ClaimToken[] {
  * Returns false (without writing) if the token doesn't exist or was already
  * used — callers must check this before creating the certificate record.
  */
-export function claimToken(token: string, certificateId: string): boolean {
-  const store = readStore();
-  const record = store[token];
-  if (!record || record.used) return false;
+export async function claimToken(token: string, _certificateId: string): Promise<boolean> {
+  // _certificateId isn't written here — it's recorded via
+  // certificates.claim_token when the certificate row is inserted (see
+  // certificateStore.saveIssuedCertificate), which is the only point both
+  // rows exist and the FK can be satisfied.
+  return withTransaction(async (client) => {
+    const rows = await client.query<{ used: boolean }>(
+      "SELECT used FROM claim_tokens WHERE token = $1 FOR UPDATE",
+      [token]
+    );
+    const record = rows[0];
+    if (!record || record.used) return false;
 
-  record.used = true;
-  record.usedAt = new Date().toISOString();
-  record.certificateId = certificateId;
-  writeStore(store);
-  return true;
+    await client.query(
+      "UPDATE claim_tokens SET used = true, used_at = now() WHERE token = $1",
+      [token]
+    );
+    return true;
+  });
 }

@@ -9,5 +9,5 @@ export default async function AdminCertificatesPage() {
     redirect("/admin/login");
   }
 
-  return <AdminCertificates username={username} certificates={listIssuedCertificates()} />;
+  return <AdminCertificates username={username} certificates={await listIssuedCertificates()} />;
 }

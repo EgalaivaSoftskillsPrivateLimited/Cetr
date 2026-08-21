@@ -22,10 +22,10 @@ import {
   generateCertificateId,
 } from "@/lib/workshop";
 
-function generateUniqueCertificateId(): string {
+async function generateUniqueCertificateId(): Promise<string> {
   for (let attempts = 0; attempts < 20; attempts += 1) {
     const id = generateCertificateId();
-    if (!certificateIdExists(id)) return id;
+    if (!(await certificateIdExists(id))) return id;
   }
   throw new Error("Could not allocate a unique certificate ID.");
 }
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  const claim = findClaimToken(token);
+  const claim = await findClaimToken(token);
   if (!claim) {
     return NextResponse.json(
       { error: "This claim link is invalid. Ask your workshop organizer for a new one." },
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   let certificateId: string;
   try {
-    certificateId = generateUniqueCertificateId();
+    certificateId = await generateUniqueCertificateId();
   } catch {
     return NextResponse.json(
       { error: "Could not issue a certificate. Please try again." },
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!claimToken(token, certificateId)) {
+  if (!(await claimToken(token, certificateId))) {
     return NextResponse.json(
       { error: "This claim link has already been used. Each link works once." },
       { status: 409 }
@@ -117,9 +117,10 @@ export async function POST(request: NextRequest) {
     improvementSuggestion: data.improvementSuggestion?.trim() || undefined,
     issuedAt: new Date().toISOString(),
     emailSent: false,
+    claimToken: token,
   };
 
-  saveIssuedCertificate(record);
+  await saveIssuedCertificate(record);
 
   let emailSent = false;
   let emailError: string | undefined;
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
       console.error(`[certificates/issue] Failed to email ${certificateId}:`, err);
     }
   }
-  markCertificateEmailSent(certificateId, emailSent);
+  await markCertificateEmailSent(certificateId, emailSent);
 
   return NextResponse.json({
     certificateId,
