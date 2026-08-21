@@ -3,7 +3,7 @@
 # does not provide a browser inside Docker. Puppeteer downloads Chrome itself.
 
 [phases.setup]
-nixPkgs = ["nodejs_22", "npm"]
+nixPkgs = ["nodejs_22"]
 aptPkgs = [
   "ca-certificates",
   "fonts-liberation",
