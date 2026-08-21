@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
-import path from "path";
+import { prisma } from "@/lib/prisma";
+import type { ClaimToken as ClaimTokenRow, Certificate as CertificateRow, Program } from "@/generated/prisma/client";
 
 export interface ClaimToken {
   token: string;
@@ -15,68 +15,74 @@ export interface ClaimToken {
   certificateType: string;
 }
 
-const STORE_DIR = path.join(process.cwd(), "private");
-const STORE_PATH = path.join(STORE_DIR, "claim-tokens.json");
+type ClaimTokenWithRelations = ClaimTokenRow & {
+  program: Program;
+  certificate: CertificateRow | null;
+};
 
-type Store = Record<string, ClaimToken>;
-
-function readStore(): Store {
-  try {
-    return JSON.parse(readFileSync(STORE_PATH, "utf-8")) as Store;
-  } catch {
-    return {};
-  }
-}
-
-function writeStore(store: Store): void {
-  mkdirSync(STORE_DIR, { recursive: true });
-  writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), "utf-8");
+function toClaimToken(row: ClaimTokenWithRelations): ClaimToken {
+  return {
+    token: row.token,
+    createdAt: row.createdAt.toISOString(),
+    createdBy: row.createdBy,
+    used: row.used,
+    usedAt: row.usedAt?.toISOString(),
+    certificateId: row.certificate?.certificateId ?? undefined,
+    programName: row.program.name,
+    certificateType: row.program.certificateType,
+  };
 }
 
 function generateToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
+async function resolveProgramId(name: string, certificateType: string): Promise<number> {
+  const program = await prisma.program.upsert({
+    where: { name_certificateType: { name, certificateType } },
+    create: { name, certificateType },
+    update: {},
+  });
+  return program.id;
+}
+
 /** Generates `count` fresh single-use claim links (1-500), all for the same course/certificate type. */
-export function createClaimTokens(
+export async function createClaimTokens(
   count: number,
   createdBy: string,
   programName: string,
   certificateType: string
-): ClaimToken[] {
-  const store = readStore();
-  const created: ClaimToken[] = [];
+): Promise<ClaimToken[]> {
+  const programId = await resolveProgramId(programName, certificateType);
 
-  for (let i = 0; i < count; i += 1) {
-    let token = generateToken();
-    while (token in store) {
-      token = generateToken();
+  return prisma.$transaction(async (tx) => {
+    const created: ClaimToken[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const row = await tx.claimToken.create({
+        data: { token: generateToken(), programId, createdBy },
+        include: { program: true, certificate: true },
+      });
+      created.push(toClaimToken(row));
     }
-    const record: ClaimToken = {
-      token,
-      createdAt: new Date().toISOString(),
-      createdBy,
-      used: false,
-      programName,
-      certificateType,
-    };
-    store[token] = record;
-    created.push(record);
-  }
-
-  writeStore(store);
-  return created;
+    return created;
+  });
 }
 
-export function findClaimToken(token: string): ClaimToken | undefined {
-  return readStore()[token];
+export async function findClaimToken(token: string): Promise<ClaimToken | undefined> {
+  const row = await prisma.claimToken.findUnique({
+    where: { token },
+    include: { program: true, certificate: true },
+  });
+  return row ? toClaimToken(row) : undefined;
 }
 
 /** Newest first. */
-export function listClaimTokens(): ClaimToken[] {
-  return Object.values(readStore()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+export async function listClaimTokens(): Promise<ClaimToken[]> {
+  const rows = await prisma.claimToken.findMany({
+    include: { program: true, certificate: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map(toClaimToken);
 }
 
 /**
@@ -84,14 +90,18 @@ export function listClaimTokens(): ClaimToken[] {
  * Returns false (without writing) if the token doesn't exist or was already
  * used — callers must check this before creating the certificate record.
  */
-export function claimToken(token: string, certificateId: string): boolean {
-  const store = readStore();
-  const record = store[token];
-  if (!record || record.used) return false;
-
-  record.used = true;
-  record.usedAt = new Date().toISOString();
-  record.certificateId = certificateId;
-  writeStore(store);
-  return true;
+export async function claimToken(token: string, _certificateId: string): Promise<boolean> {
+  // _certificateId isn't written here — it's recorded via
+  // certificates.claimToken when the certificate row is inserted (see
+  // certificateStore.saveIssuedCertificate), which is the only point both
+  // rows exist and the FK can be satisfied.
+  try {
+    const { count } = await prisma.claimToken.updateMany({
+      where: { token, used: false },
+      data: { used: true, usedAt: new Date() },
+    });
+    return count === 1;
+  } catch {
+    return false;
+  }
 }

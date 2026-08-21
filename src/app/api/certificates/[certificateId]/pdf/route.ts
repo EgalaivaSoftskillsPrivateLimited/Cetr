@@ -10,7 +10,7 @@ export async function GET(
   ctx: RouteContext<"/api/certificates/[certificateId]/pdf">
 ) {
   const { certificateId } = await ctx.params;
-  const record = getCertificate(certificateId);
+  const record = await getCertificate(certificateId);
 
   if (!record) {
     return NextResponse.json({ error: "Certificate not found." }, { status: 404 });

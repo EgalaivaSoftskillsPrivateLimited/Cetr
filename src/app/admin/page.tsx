@@ -11,11 +11,14 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  const links: AdminLink[] = listClaimTokens().map((t) => ({
-    ...t,
-    url: `${getSiteUrl()}/claim/${t.token}`,
-    recipientName: t.certificateId ? getCertificate(t.certificateId)?.recipientName : undefined,
-  }));
+  const tokens = await listClaimTokens();
+  const links: AdminLink[] = await Promise.all(
+    tokens.map(async (t) => ({
+      ...t,
+      url: `${getSiteUrl()}/claim/${t.token}`,
+      recipientName: t.certificateId ? (await getCertificate(t.certificateId))?.recipientName : undefined,
+    }))
+  );
 
   return <AdminDashboard username={username} initialLinks={links} />;
 }

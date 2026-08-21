@@ -8,7 +8,7 @@ export default async function VerifyPage({
   params,
 }: PageProps<"/verify/[certificateId]">) {
   const { certificateId } = await params;
-  const record = getCertificate(certificateId);
+  const record = await getCertificate(certificateId);
 
   if (!record) {
     return (

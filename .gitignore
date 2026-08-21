@@ -27,3 +27,5 @@ next-env.d.ts
 
 # local-only files not meant to be served from public/ or committed
 /private/
+
+/src/generated/prisma

@@ -32,7 +32,7 @@ export default async function ClaimTokenPage({
   params,
 }: PageProps<"/claim/[token]">) {
   const { token } = await params;
-  const claim = findClaimToken(token);
+  const claim = await findClaimToken(token);
 
   if (!claim) {
     return (
@@ -44,7 +44,7 @@ export default async function ClaimTokenPage({
   }
 
   if (claim.used) {
-    const certificate = claim.certificateId ? getCertificate(claim.certificateId) : undefined;
+    const certificate = claim.certificateId ? await getCertificate(claim.certificateId) : undefined;
     return (
       <InvalidLinkCard
         heading="Link Already Used"

@@ -14,7 +14,7 @@ export default async function CertificatePrintPage({
   const rawId = Array.isArray(id) ? id[0] : id;
   const certificateId = rawId ?? DEFAULT_CERTIFICATE_ID;
 
-  const record = getCertificate(certificateId);
+  const record = await getCertificate(certificateId);
 
   if (!record) {
     notFound();

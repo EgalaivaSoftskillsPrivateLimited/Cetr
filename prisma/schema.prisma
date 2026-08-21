@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Program {
+  id              Int           @id @default(autoincrement())
+  name            String
+  certificateType String        @map("certificate_type")
+  certificates    Certificate[]
+  claimTokens     ClaimToken[]
+
+  @@unique([name, certificateType])
+  @@map("programs")
+}
+
+model ClaimToken {
+  token       String       @id
+  programId   Int          @map("program_id")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy   String       @map("created_by")
+  used        Boolean      @default(false)
+  usedAt      DateTime?    @map("used_at") @db.Timestamptz(6)
+  program     Program      @relation(fields: [programId], references: [id])
+  certificate Certificate?
+
+  @@index([createdAt(sort: Desc)], map: "idx_claim_tokens_created_at")
+  @@map("claim_tokens")
+}
+
+model Certificate {
+  certificateId         String      @id @map("certificate_id")
+  claimToken            String?     @unique @map("claim_token")
+  programId             Int         @map("program_id")
+  duration              String
+  companyName           String      @map("company_name")
+  founderName           String      @map("founder_name")
+  founderTitle          String      @map("founder_title")
+  issueDate             String      @map("issue_date")
+  recipientName         String      @map("recipient_name")
+  email                 String
+  phone                 String
+  college               String
+  quizAnswers           Json        @map("quiz_answers")
+  quizScore             Int         @map("quiz_score")
+  workshopRating        Int         @map("workshop_rating")
+  usefulnessRating      Int         @map("usefulness_rating")
+  engagementRating      Int         @map("engagement_rating")
+  practicalRating       Int         @map("practical_rating")
+  likedMost             String?     @map("liked_most")
+  improvementSuggestion String?     @map("improvement_suggestion")
+  issuedAt              DateTime    @default(now()) @map("issued_at") @db.Timestamptz(6)
+  emailSent             Boolean     @default(false) @map("email_sent")
+  source                String?
+  program               Program     @relation(fields: [programId], references: [id])
+  claimTokenRef         ClaimToken? @relation(fields: [claimToken], references: [token])
+
+  @@index([email], map: "idx_certificates_email")
+  @@index([issuedAt(sort: Desc)], map: "idx_certificates_issued_at")
+  @@map("certificates")
+}

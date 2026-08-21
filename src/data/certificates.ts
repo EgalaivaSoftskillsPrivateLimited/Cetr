@@ -28,7 +28,7 @@ const SEED_CERTIFICATES: Record<string, CertificateRecord> = {
   },
 };
 
-export function getCertificate(certificateId: string): CertificateRecord | undefined {
+export async function getCertificate(certificateId: string): Promise<CertificateRecord | undefined> {
   let id = certificateId.trim();
   try {
     id = decodeURIComponent(certificateId).trim();
@@ -40,7 +40,7 @@ export function getCertificate(certificateId: string): CertificateRecord | undef
   const seeded = SEED_CERTIFICATES[id];
   if (seeded) return seeded;
 
-  const issued = findIssuedCertificate(id);
+  const issued = await findIssuedCertificate(id);
   if (!issued) return undefined;
 
   return {

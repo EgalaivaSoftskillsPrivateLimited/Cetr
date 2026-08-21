@@ -9,7 +9,7 @@ export async function POST(
   ctx: RouteContext<"/api/certificates/[certificateId]/email">
 ) {
   const { certificateId } = await ctx.params;
-  const record = findIssuedCertificate(certificateId);
+  const record = await findIssuedCertificate(certificateId);
 
   if (!record) {
     return NextResponse.json({ error: "Certificate not found." }, { status: 404 });
@@ -31,10 +31,10 @@ export async function POST(
       verificationUrl: buildVerificationUrl(record.certificateId),
       pdfBuffer,
     });
-    markCertificateEmailSent(record.certificateId, true);
+    await markCertificateEmailSent(record.certificateId, true);
     return NextResponse.json({ emailSent: true });
   } catch (err) {
-    markCertificateEmailSent(record.certificateId, false);
+    await markCertificateEmailSent(record.certificateId, false);
     const message = err instanceof Error ? err.message : "Unknown email error.";
     console.error(`[certificates/email] Failed to resend ${record.certificateId}:`, err);
     return NextResponse.json({ emailSent: false, error: message }, { status: 502 });

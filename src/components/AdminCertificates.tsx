@@ -8,6 +8,9 @@ import { AnnotationTag, btnPrimary, btnSecondary, CornerHandles, Eyebrow } from 
 import type { IssuedCertificate } from "@/lib/certificateStore";
 
 type SourceFilter = "all" | "self-serve" | "bulk-admin";
+type EmailFilter = "all" | "sent" | "not-sent";
+
+const ALL = "__all__";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("en-IN", {
@@ -41,12 +44,38 @@ export default function AdminCertificates({
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [emailFilter, setEmailFilter] = useState<EmailFilter>("all");
+  const [courseFilter, setCourseFilter] = useState(ALL);
+  const [typeFilter, setTypeFilter] = useState(ALL);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const courses = useMemo(
+    () => Array.from(new Set(certificates.map((c) => c.programName))).sort(),
+    [certificates]
+  );
+  const types = useMemo(
+    () => Array.from(new Set(certificates.map((c) => c.certificateType))).sort(),
+    [certificates]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const from = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
+    const to = toDate ? new Date(`${toDate}T23:59:59`).getTime() : null;
+
     return certificates.filter((c) => {
       if (sourceFilter !== "all" && (c.source ?? "self-serve") !== sourceFilter) return false;
+      if (emailFilter === "sent" && !c.emailSent) return false;
+      if (emailFilter === "not-sent" && c.emailSent) return false;
+      if (courseFilter !== ALL && c.programName !== courseFilter) return false;
+      if (typeFilter !== ALL && c.certificateType !== typeFilter) return false;
+
+      const issuedAt = new Date(c.issuedAt).getTime();
+      if (from !== null && issuedAt < from) return false;
+      if (to !== null && issuedAt > to) return false;
+
       if (!q) return true;
       return (
         c.recipientName.toLowerCase().includes(q) ||
@@ -55,7 +84,26 @@ export default function AdminCertificates({
         c.college.toLowerCase().includes(q)
       );
     });
-  }, [certificates, search, sourceFilter]);
+  }, [certificates, search, sourceFilter, emailFilter, courseFilter, typeFilter, fromDate, toDate]);
+
+  const hasActiveFilters =
+    search.trim() !== "" ||
+    sourceFilter !== "all" ||
+    emailFilter !== "all" ||
+    courseFilter !== ALL ||
+    typeFilter !== ALL ||
+    fromDate !== "" ||
+    toDate !== "";
+
+  const handleClearFilters = () => {
+    setSearch("");
+    setSourceFilter("all");
+    setEmailFilter("all");
+    setCourseFilter(ALL);
+    setTypeFilter(ALL);
+    setFromDate("");
+    setToDate("");
+  };
 
   const handleLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -113,51 +161,146 @@ export default function AdminCertificates({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="search">
-                Search
-              </label>
-              <input
-                id="search"
-                type="text"
-                placeholder="Name, email, college, or certificate ID"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue sm:w-72"
-              />
+        <div className="relative rounded-2xl border border-dashed border-ink/15 p-6">
+          <CornerHandles />
+          <span className="absolute -top-2.5 left-4 bg-paper px-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-ink/40">
+            Filters
+          </span>
+
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="search">
+                  Search
+                </label>
+                <input
+                  id="search"
+                  type="text"
+                  placeholder="Name, email, college, or certificate ID"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue sm:w-64"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="course">
+                  Course
+                </label>
+                <select
+                  id="course"
+                  value={courseFilter}
+                  onChange={(e) => setCourseFilter(e.target.value)}
+                  className="rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue"
+                >
+                  <option value={ALL}>All</option>
+                  {courses.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="type">
+                  Certificate Type
+                </label>
+                <select
+                  id="type"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue"
+                >
+                  <option value={ALL}>All</option>
+                  {types.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="source">
+                  Source
+                </label>
+                <select
+                  id="source"
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
+                  className="rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue"
+                >
+                  <option value="all">All</option>
+                  <option value="self-serve">Self-Serve</option>
+                  <option value="bulk-admin">Bulk</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="email">
+                  Emailed
+                </label>
+                <select
+                  id="email"
+                  value={emailFilter}
+                  onChange={(e) => setEmailFilter(e.target.value as EmailFilter)}
+                  className="rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue"
+                >
+                  <option value="all">All</option>
+                  <option value="sent">Sent</option>
+                  <option value="not-sent">Not Sent</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="fromDate">
+                  Issued From
+                </label>
+                <input
+                  id="fromDate"
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="toDate">
+                  Issued To
+                </label>
+                <input
+                  id="toDate"
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue"
+                />
+              </div>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="rounded-xl border border-ink/15 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-ink/60 transition-colors hover:bg-ink/5"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold uppercase tracking-wide text-ink/65" htmlFor="source">
-                Source
-              </label>
-              <select
-                id="source"
-                value={sourceFilter}
-                onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
-                className="rounded-xl border border-ink/12 bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-blue"
+
+            <div className="relative">
+              <AnnotationTag className="absolute -top-8 right-0 hidden -rotate-3 sm:inline-flex">
+                → Download
+              </AnnotationTag>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={filtered.length === 0}
+                className={`${btnPrimary} px-6 py-2.5`}
               >
-                <option value="all">All</option>
-                <option value="self-serve">Self-Serve</option>
-                <option value="bulk-admin">Bulk</option>
-              </select>
+                Export To Excel ↓
+              </button>
             </div>
           </div>
 
-          <div className="relative">
-            <AnnotationTag className="absolute -top-8 right-0 hidden -rotate-3 sm:inline-flex">
-              → Download
-            </AnnotationTag>
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={filtered.length === 0}
-              className={`${btnPrimary} px-6 py-2.5`}
-            >
-              Export To Excel ↓
-            </button>
-          </div>
+          <p className="mt-4 text-xs font-bold uppercase tracking-wide text-ink/45">
+            Showing {filtered.length} of {certificates.length}
+          </p>
         </div>
 
         <div className="relative overflow-hidden rounded-2xl border border-dashed border-ink/15">
