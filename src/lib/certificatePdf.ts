@@ -1,7 +1,22 @@
 import puppeteer, { type Browser } from "puppeteer";
 import { getSiteUrl } from "@/lib/siteUrl";
 
-const LAUNCH_ARGS = ["--no-sandbox", "--disable-setuid-sandbox"];
+const LAUNCH_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+];
+
+function launchOptions() {
+  const executablePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH;
+  return {
+    headless: true as const,
+    args: LAUNCH_ARGS,
+    ...(executablePath ? { executablePath } : {}),
+  };
+}
 
 async function renderWithBrowser(browser: Browser, certificateId: string): Promise<Buffer> {
   const url = `${getSiteUrl()}/certificate-print?id=${encodeURIComponent(certificateId)}`;
@@ -30,7 +45,7 @@ async function renderWithBrowser(browser: Browser, certificateId: string): Promi
  * exactly — no separate PDF template to maintain.
  */
 export async function renderCertificatePdf(certificateId: string): Promise<Buffer> {
-  const browser = await puppeteer.launch({ headless: true, args: LAUNCH_ARGS });
+  const browser = await puppeteer.launch(launchOptions());
   try {
     return await renderWithBrowser(browser, certificateId);
   } finally {
@@ -46,7 +61,7 @@ export async function renderCertificatePdf(certificateId: string): Promise<Buffe
 export async function withCertificatePdfBrowser<T>(
   fn: (render: (certificateId: string) => Promise<Buffer>) => Promise<T>
 ): Promise<T> {
-  const browser = await puppeteer.launch({ headless: true, args: LAUNCH_ARGS });
+  const browser = await puppeteer.launch(launchOptions());
   try {
     return await fn((certificateId) => renderWithBrowser(browser, certificateId));
   } finally {
