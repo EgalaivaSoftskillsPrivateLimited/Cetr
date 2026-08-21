@@ -13,7 +13,19 @@ function createPrismaClient(): PrismaClient {
   return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 }
 
-// Cached on globalThis so Next.js dev-mode module reloads don't open a new
-// connection pool on every edit.
-export const prisma = globalThis.__prisma ?? createPrismaClient();
-if (process.env.NODE_ENV !== "production") globalThis.__prisma = prisma;
+function getPrisma(): PrismaClient {
+  if (!globalThis.__prisma) {
+    globalThis.__prisma = createPrismaClient();
+  }
+  return globalThis.__prisma;
+}
+
+// Lazy so `next build` can import API routes without DATABASE_URL.
+// The client is created on the first real query at runtime.
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getPrisma();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
