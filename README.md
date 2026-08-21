@@ -10,7 +10,11 @@ cp .env.example .env.local   # fill in DATABASE_URL, ADMIN_PASSWORD, SMTP_*, SES
 npm run dev
 ```
 
-Needs a running Postgres instance — set `DATABASE_URL` in `.env.local` to point at it. Schema (`migrations/*.sql`) is applied automatically on first request; no manual migration step needed.
+Needs a running Postgres instance — set `DATABASE_URL` in `.env.local` to point at it, then apply the schema:
+
+```bash
+npx prisma migrate deploy   # or: npm run db:migrate
+```
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -39,13 +43,13 @@ Tokens are stored in the `claim_tokens` table (Postgres — see `src/lib/claimTo
 
 ## Database
 
-Postgres, accessed via the `pg` driver (`src/lib/db.ts`) — no ORM. Schema:
+Postgres via [Prisma](https://www.prisma.io/) (`prisma/schema.prisma`, client accessed through `src/lib/prisma.ts`). Schema:
 
 - `programs` — distinct (name, certificate type) pairs, e.g. ("AI Engineering Workshop", "Appreciation").
 - `claim_tokens` — single-use links, referencing the `programs` row they'll issue a certificate for.
-- `certificates` — issued certificate metadata, referencing `programs` and (optionally) the `claim_tokens` row it was claimed through. `duration`/`company_name`/`founder_name`/`founder_title`/`issue_date` are snapshotted at issue time rather than joined live, so a certificate stays historically accurate if `src/lib/workshop.ts` constants change later.
+- `certificates` — issued certificate metadata, referencing `programs` and (optionally, uniquely) the `claim_tokens` row it was claimed through. `duration`/`companyName`/`founderName`/`founderTitle`/`issueDate` are snapshotted at issue time rather than joined live, so a certificate stays historically accurate if `src/lib/workshop.ts` constants change later.
 
-Migrations live in `migrations/*.sql` and run automatically (tracked in a `schema_migrations` table) the first time the app queries the database — add a new numbered `.sql` file for schema changes, don't edit applied ones.
+Migrations live in `prisma/migrations/` and are **not** applied automatically — run `npm run db:migrate` (`prisma migrate deploy`) as an explicit step whenever you deploy or pull new migrations, before starting the app. To change the schema locally: edit `prisma/schema.prisma`, then run `npx prisma migrate dev --name <description>` (needs an interactive terminal and a DB role with `CREATEDB`, for its shadow database) and commit the generated `prisma/migrations/<...>/migration.sql`. `npm install` regenerates the Prisma Client automatically (`postinstall` script) — regenerate manually with `npx prisma generate` if you edit the schema without reinstalling.
 
 If SMTP isn't configured (or the send fails), the certificate is still issued and shown to the participant — they just see a note that the email didn't go out automatically, with a retry button that calls `/api/certificates/<id>/email`.
 
